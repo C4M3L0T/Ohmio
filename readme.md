@@ -27,7 +27,7 @@
 
 ---
 
-## ⚔ What is Ohmio? / ¿Qué es Ohmio?
+##  What is Ohmio? / ¿Qué es Ohmio?
 
 **EN** — Ohmio is a terminal RPG habit tracker forged in pure C. It transforms your daily routines into a character-building system: complete habits, earn XP, level up, evolve your powers, and redeem real-world rewards with the XP you've earned through discipline.
 
@@ -35,11 +35,11 @@
 
 ---
 
-## 🗺 The Panels / Los Paneles
+## The Panels / Los Paneles
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│ ⚔  OHMIO        Kael               LVL 7   XP ████████░░  340/580│
+│   OHMIO        Kael               LVL 7   XP ████████░░  340/580│
 ├──────────────┬───────────────────────────────────────────────────┤
 │              │                                                   │
 │  MENU        │   HABITOS DE HOY                      4/5        │
@@ -175,7 +175,7 @@ exec-once = ~/.local/bin/ohmio-daemon
 
 ---
 
-## 🗡 Keybindings / Controles
+## Keybindings / Controles
 
 | Key / Tecla | Action EN | Acción ES |
 |-------------|-----------|-----------|
@@ -190,7 +190,7 @@ exec-once = ~/.local/bin/ohmio-daemon
 
 ---
 
-## 🏛 Project Structure / Estructura del Proyecto
+## Project Structure / Estructura del Proyecto
 
 ```
 ohmio/
