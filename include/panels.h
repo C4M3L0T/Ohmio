@@ -13,5 +13,7 @@ void panel_draw_rewards(WINDOW *w, GameState *gs);
 void panel_habits_move(GameState *gs, int dir);
 void panel_habits_complete(GameState *gs);
 void panel_habits_add(GameState *gs, WINDOW *footer);
+void panel_habits_edit(GameState *gs, WINDOW *footer);
+void panel_habits_delete(GameState *gs, WINDOW *footer);
 
 #endif

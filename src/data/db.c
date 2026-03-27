@@ -286,3 +286,37 @@ int db_save_daily_log(int completed, int total, int xp,
     sqlite3_finalize(stmt);
     return (rc == SQLITE_DONE) ? 0 : -1;
 }
+
+int db_delete_habit(int id) {
+    const char *sql = "DELETE FROM habits WHERE id = ?;";
+    sqlite3_stmt *stmt;
+    sqlite3_prepare_v2(DB, sql, -1, &stmt, NULL);
+    sqlite3_bind_int(stmt, 1, id);
+    int rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+
+    // También borra su historial de completions
+    const char *sql2 = "DELETE FROM completions WHERE habit_id = ?;";
+    sqlite3_prepare_v2(DB, sql2, -1, &stmt, NULL);
+    sqlite3_bind_int(stmt, 1, id);
+    sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+
+    return (rc == SQLITE_DONE) ? 0 : -1;
+}
+
+int db_update_habit(const Habit *h) {
+    const char *sql =
+        "UPDATE habits SET name=?, icon=?, xp_reward=?, category=?"
+        " WHERE id=?;";
+    sqlite3_stmt *stmt;
+    sqlite3_prepare_v2(DB, sql, -1, &stmt, NULL);
+    sqlite3_bind_text(stmt, 1, h->name,     -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 2, h->icon,     -1, SQLITE_STATIC);
+    sqlite3_bind_int (stmt, 3, h->xp_reward);
+    sqlite3_bind_int (stmt, 4, h->category);
+    sqlite3_bind_int (stmt, 5, h->id);
+    int rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    return (rc == SQLITE_DONE) ? 0 : -1;
+}

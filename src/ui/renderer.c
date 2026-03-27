@@ -92,14 +92,20 @@ void render_footer(WINDOW *w, int view) {
     mvwprintw(w, 1, 2, "[j/k] Navegar");
     wattroff(w, COLOR_PAIR(1));
 
-    if (view == 0) {  // VIEW_HABITS
-        wattron(w, COLOR_PAIR(3));
-        mvwprintw(w, 1, 18, "[SPACE] Completar");
-        wattroff(w, COLOR_PAIR(3));
-        wattron(w, COLOR_PAIR(2));
-        mvwprintw(w, 1, 38, "[a] Agregar");
-        wattroff(w, COLOR_PAIR(2));
-    }
+	if (view == 0) {
+	    wattron(w, COLOR_PAIR(3));
+	    mvwprintw(w, 1, 18, "[SPC] Completar");
+	    wattroff(w, COLOR_PAIR(3));
+	    wattron(w, COLOR_PAIR(2));
+	    mvwprintw(w, 1, 36, "[a] Agregar");
+	    wattroff(w, COLOR_PAIR(2));
+	    wattron(w, COLOR_PAIR(1));
+	    mvwprintw(w, 1, 50, "[e] Editar");
+	    wattroff(w, COLOR_PAIR(1));
+	    wattron(w, COLOR_PAIR(4));
+	    mvwprintw(w, 1, 63, "[d] Borrar");
+	    wattroff(w, COLOR_PAIR(4));
+	}
 
     wattron(w, COLOR_PAIR(4));
     mvwprintw(w, 1, COLS - 12, "[q] Salir");

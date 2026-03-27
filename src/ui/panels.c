@@ -1,5 +1,6 @@
 #include <ncurses.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "panels.h"
 #include "renderer.h"
@@ -268,4 +269,129 @@ void panel_draw_rewards(WINDOW *w, GameState *gs) {
     }
 
     wrefresh(w);
+}
+
+// Pide un string al usuario en el footer, retorna 0 si cancela
+static int prompt_string(WINDOW *footer, const char *label,
+                          char *out, int maxlen) {
+    nodelay(stdscr, FALSE);
+    curs_set(1);
+    echo();
+
+    werase(footer);
+    draw_box_gold(footer);
+    wattron(footer, COLOR_PAIR(2));
+    mvwprintw(footer, 1, 2, "%s", label);
+    wattroff(footer, COLOR_PAIR(2));
+    wattron(footer, COLOR_PAIR(6));
+    mvwprintw(footer, 1, 2 + strlen(label), "[ESC cancela]: ");
+    wattroff(footer, COLOR_PAIR(6));
+    wrefresh(footer);
+
+    char buf[256] = {0};
+    // Muestra el valor actual como placeholder
+    mvwprintw(footer, 1, 2 + strlen(label) + 15, "%s", out);
+    wrefresh(footer);
+
+    int result = mvwgetnstr(footer, 1, 2 + strlen(label) + 15,
+                            buf, maxlen - 1);
+
+    noecho();
+    curs_set(0);
+    nodelay(stdscr, TRUE);
+
+    if (result == ERR || strlen(buf) == 0) return 0;
+    strncpy(out, buf, maxlen - 1);
+    out[maxlen - 1] = '\0';
+    return 1;
+}
+
+// Pide confirmación Y/N
+static int prompt_confirm(WINDOW *footer, const char *msg) {
+    nodelay(stdscr, FALSE);
+    noecho();
+
+    werase(footer);
+    draw_box_gold(footer);
+    wattron(footer, COLOR_PAIR(4) | A_BOLD);
+    mvwprintw(footer, 1, 2, "%s [s/n]: ", msg);
+    wattroff(footer, COLOR_PAIR(4) | A_BOLD);
+    wrefresh(footer);
+
+    int ch = wgetch(footer);
+    nodelay(stdscr, TRUE);
+    return (ch == 's' || ch == 'S');
+}
+
+void panel_habits_edit(GameState *gs, WINDOW *footer) {
+    if (gs->habit_count == 0) return;
+    Habit *h = &gs->habits[habit_cursor];
+
+    // Categorías disponibles
+    const char *cat_names[] = {
+        "0-Fisico", "1-Mental", "2-Salud", "3-Social", "4-Creativo"
+    };
+
+    // Edita nombre
+    char new_name[MAX_NAME];
+    strncpy(new_name, h->name, MAX_NAME);
+    if (!prompt_string(footer, "Nombre: ", new_name, MAX_NAME)) return;
+
+    // Edita icono
+    char new_icon[MAX_ICON];
+    strncpy(new_icon, h->icon, MAX_ICON);
+    prompt_string(footer, "Icono:  ", new_icon, MAX_ICON);
+
+    // Edita XP — pide número como string y convierte
+    char xp_str[8];
+    snprintf(xp_str, sizeof(xp_str), "%d", h->xp_reward);
+    if (prompt_string(footer, "XP base:", xp_str, 8))
+        h->xp_reward = atoi(xp_str);
+
+    // Edita categoría
+    char cat_str[2];
+    snprintf(cat_str, sizeof(cat_str), "%d", h->category);
+
+    // Muestra opciones en footer
+    nodelay(stdscr, FALSE);
+    werase(footer);
+    draw_box_gold(footer);
+    wattron(footer, COLOR_PAIR(1));
+    mvwprintw(footer, 1, 2,
+              "Cat [0]Fisico [1]Mental [2]Salud [3]Social [4]Creativo (actual:%d): ",
+              h->category);
+    wattroff(footer, COLOR_PAIR(1));
+    wrefresh(footer);
+    int ch = wgetch(footer) - '0';
+    if (ch >= 0 && ch <= 4) h->category = ch;
+    nodelay(stdscr, TRUE);
+
+    // Aplica cambios
+    strncpy(h->name, new_name, MAX_NAME - 1);
+    h->name[MAX_NAME - 1] = '\0';
+    strncpy(h->icon, new_icon, MAX_ICON - 1);
+    h->icon[MAX_ICON - 1] = '\0';
+
+    db_update_habit(h);
+}
+
+void panel_habits_delete(GameState *gs, WINDOW *footer) {
+    if (gs->habit_count == 0) return;
+    Habit *h = &gs->habits[habit_cursor];
+
+    char msg[128];
+    snprintf(msg, sizeof(msg), "Borrar '%s'?", h->name);
+    if (!prompt_confirm(footer, msg)) return;
+
+    db_delete_habit(h->id);
+
+    // Elimina del array en memoria desplazando
+    for (int i = habit_cursor; i < gs->habit_count - 1; i++)
+        gs->habits[i] = gs->habits[i + 1];
+
+    gs->habit_count--;
+
+    // Ajusta cursor si quedó fuera del rango
+    if (habit_cursor >= gs->habit_count && habit_cursor > 0)
+        habit_cursor--;
 }

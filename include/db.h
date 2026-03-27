@@ -15,5 +15,7 @@ int  db_load_habits(Habit *habits, int *count);
 int  db_log_completion(int habit_id, int xp_earned, int streak);
 int  db_save_daily_log(int completed, int total, int xp,
                        int mood, float sleep, int perfect);
+int db_delete_habit(int id);
+int db_update_habit(const Habit *h);
 
 #endif

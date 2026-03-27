@@ -142,6 +142,15 @@ static void handle_input(int ch, GameState *gs) {
         case KEY_RESIZE:
             handle_resize();
             break;
+	case 'e': case 'E':
+	    if (current_view == VIEW_HABITS)
+	        panel_habits_edit(gs, win_footer);
+	    break;
+
+	case 'd': case 'D':
+	    if (current_view == VIEW_HABITS)
+	        panel_habits_delete(gs, win_footer);
+	    break;
     }
 }
 
