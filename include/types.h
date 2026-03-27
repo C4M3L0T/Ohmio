@@ -61,6 +61,7 @@ typedef struct {
 	Hero hero;
 	Reward rewards[50];
 	int reward_count;
+	int running;
 } GameState;
 
 #endif

@@ -3,43 +3,32 @@
 #include "hero.h"
 #include "habits.h"
 #include "db.h"
+#include "tui.h"
 
 int main(void) {
     if (db_open() < 0) return 1;
 
-    // Primera vez: crear héroe
-    Hero h;
-    if (db_load_hero(&h) < 0) {
-        hero_init(&h, "Angel");
-        db_save_hero(&h);
+    GameState gs = {0};
+
+    // Carga o crea héroe
+    if (db_load_hero(&gs.hero) < 0) {
+        hero_init(&gs.hero, "Angel");
+        db_save_hero(&gs.hero);
     }
 
-    // Crear un hábito de prueba
-    Habit habits[MAX_HABITS];
-    int count;
-    db_load_habits(habits, &count);
+    // Carga hábitos
+    db_load_habits(gs.habits, &gs.habit_count);
 
-    if (count == 0) {
-        habit_init(&habits[0], 0, "Leer 30 min", "📚", 50, CAT_MENTAL);
-        habit_init(&habits[1], 1, "Ejercicio",   "⚔",  80, CAT_PHYSICAL);
-        count = 2;
-        db_save_habit(&habits[0]);
-        db_save_habit(&habits[1]);
-    }
+    // Arranca la TUI
+    tui_init();
+    tui_run(&gs);
+    tui_teardown();
 
-    // Completar hábito 0
-    int xp = habit_complete(&habits[0]);
-    if (xp > 0) {
-        printf("Hábito completado! +%d XP\n", xp);
-        db_log_completion(habits[0].id, xp, habits[0].streak);
-        db_save_habit(&habits[0]);
-        int leveled = hero_add_xp(&h, xp);
-        if (leveled) printf("⚡ LEVEL UP! Ahora eres nivel %d\n", h.level);
-        db_save_hero(&h);
-    }
-
-    printf("Héroe: %s | Nivel %d | XP %d/%d\n",
-           h.name, h.level, h.xp, h.xp_to_next);
+    // Guarda snapshot del día al salir
+    int done = habits_completed_today(gs.habits, gs.habit_count);
+    int perfect = (done == gs.habit_count && gs.habit_count > 0);
+    db_save_daily_log(done, gs.habit_count, gs.hero.xp,
+                      3, 7.5, perfect);
 
     db_close();
     return 0;
