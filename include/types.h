@@ -27,7 +27,40 @@ typedef struct{
 	int completed_today;
 	int power_level;
 	HabitCategory category;
-	time_t last_completed
+	time_t last_completed;
 } Habit;
 
+typedef struct{
+	char name[MAX_NAME];
+	int level;
+	int xp;
+	int xp_to_next;
+	// Stats derivados de categorías de hábitos
+	int strength;
+	int wisdom;
+	int vitality;
+	int charisma;
+	int discipline;
+	int total_days_played;
+	int perfect_days;
+	time_t created_at;
+} Hero;
 
+typedef struct {
+	int id;
+	char name[MAX_NAME];
+	char description[256];
+	int xp_cost;
+	int redeemed;
+	time_t redeemed_at;
+} Reward;
+
+typedef struct {
+	Habit habits[MAX_HABITS];
+	int habit_count;
+	Hero hero;
+	Reward rewards[50];
+	int reward_count;
+} GameState;
+
+#endif
