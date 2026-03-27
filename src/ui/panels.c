@@ -7,6 +7,7 @@
 #include "habits.h"
 #include "hero.h"
 #include "db.h"
+#include <math.h>
 
 // Índice del hábito seleccionado en la lista
 static int habit_cursor = 0;
@@ -202,38 +203,6 @@ void panel_draw_week(WINDOW *w, GameState *gs) {
     wrefresh(w);
 }
 
-void panel_draw_powers(WINDOW *w, GameState *gs) {
-    werase(w);
-    draw_box_gold(w);
-
-    wattron(w, COLOR_PAIR(1) | A_BOLD);
-    mvwprintw(w, 1, 2, "PODERES — TOP HABITOS");
-    wattroff(w, COLOR_PAIR(1) | A_BOLD);
-
-    // Muestra cada hábito como un poder con su power_level
-    for (int i = 0; i < gs->habit_count && i < 10; i++) {
-        Habit *h = &gs->habits[i];
-        int y = 3 + i * 2;
-
-        wattron(w, COLOR_PAIR(5) | A_BOLD);
-        mvwprintw(w, y, 2, "%s", h->icon);
-        wattroff(w, COLOR_PAIR(5) | A_BOLD);
-
-        wattron(w, COLOR_PAIR(6));
-        mvwprintw(w, y, 6, "%-20s", h->name);
-        wattroff(w, COLOR_PAIR(6));
-
-        // Barra de poder
-        draw_bar(w, y, 28, 15, h->power_level, 10, 5);
-
-        wattron(w, COLOR_PAIR(1));
-        mvwprintw(w, y, 45, "Lv%d  🔥%d", h->power_level, h->streak);
-        wattroff(w, COLOR_PAIR(1));
-    }
-
-    wrefresh(w);
-}
-
 void panel_draw_rewards(WINDOW *w, GameState *gs) {
     werase(w);
     draw_box_gold(w);
@@ -394,4 +363,117 @@ void panel_habits_delete(GameState *gs, WINDOW *footer) {
     // Ajusta cursor si quedó fuera del rango
     if (habit_cursor >= gs->habit_count && habit_cursor > 0)
         habit_cursor--;
+}
+
+// Dibuja un pie chart de los top hábitos por completions
+static void draw_pie(WINDOW *w, int cy, int cx, int radius,
+                     int *values, int count, int total) {
+    if (total == 0) return;
+
+    // Acumula ángulos por sector
+    float angles[20] = {0};
+    float accum = 0.0f;
+    for (int i = 0; i < count; i++) {
+        accum += (float)values[i] / total * 360.0f;
+        angles[i] = accum;
+    }
+
+    int colors[] = {1, 2, 3, 4, 5, 1, 2, 3, 4, 5};
+
+    // Itera cada celda dentro del bounding box
+    // Las celdas son más altas que anchas, compensamos × 2 en x
+    for (int dy = -radius; dy <= radius; dy++) {
+        for (int dx = -radius * 2; dx <= radius * 2; dx++) {
+            // Normaliza x por el aspect ratio del terminal
+            float nx = (float)dx / 2.0f;
+            float ny = (float)dy;
+            float dist = nx*nx + ny*ny;
+
+            if (dist > (float)(radius * radius)) continue;
+
+            // Ángulo del punto en grados [0, 360)
+            float angle = atan2f(ny, nx) * 180.0f / 3.14159f + 180.0f;
+
+            // Determina a qué sector pertenece
+            int sector = count - 1;
+            for (int s = 0; s < count; s++) {
+                if (angle < angles[s]) { sector = s; break; }
+            }
+
+            wattron(w, COLOR_PAIR(colors[sector % 5]));
+            mvwprintw(w, cy + dy, cx + dx, "█");
+            wattroff(w, COLOR_PAIR(colors[sector % 5]));
+        }
+    }
+}
+
+void panel_draw_powers(WINDOW *w, GameState *gs) {
+    werase(w);
+    draw_box_gold(w);
+
+    int rows, cols;
+    getmaxyx(w, rows, cols);
+
+    wattron(w, COLOR_PAIR(1) | A_BOLD);
+    mvwprintw(w, 1, 2, "PODERES — DISTRIBUCION DE HABITOS");
+    wattroff(w, COLOR_PAIR(1) | A_BOLD);
+
+    if (gs->habit_count == 0) {
+        wattron(w, COLOR_PAIR(5));
+        mvwprintw(w, rows/2, 4, "No hay habitos registrados aun.");
+        wattroff(w, COLOR_PAIR(5));
+        wrefresh(w);
+        return;
+    }
+
+    // Valores para el pie = total_completions por hábito
+    int values[MAX_HABITS];
+    int total = 0;
+    for (int i = 0; i < gs->habit_count; i++) {
+        values[i] = gs->habits[i].total_completions;
+        total    += values[i];
+    }
+    // Si nadie tiene completions usa xp_reward como peso
+    if (total == 0) {
+        for (int i = 0; i < gs->habit_count; i++) {
+            values[i] = gs->habits[i].xp_reward;
+            total    += values[i];
+        }
+    }
+
+    // Pie chart centrado en la mitad izquierda
+    int radius = (rows - 6) / 2;
+    if (radius > 8) radius = 8;
+    int cy = rows / 2;
+    int cx = cols / 4 + 4;
+    draw_pie(w, cy, cx, radius, values, gs->habit_count, total);
+
+    // Leyenda a la derecha del pie
+    int legend_x = cx + radius * 2 + 4;
+    int colors[] = {1, 2, 3, 4, 5, 1, 2, 3, 4, 5};
+
+    wattron(w, COLOR_PAIR(1) | A_BOLD);
+    mvwprintw(w, 3, legend_x, "LEYENDA");
+    wattroff(w, COLOR_PAIR(1) | A_BOLD);
+
+    for (int i = 0; i < gs->habit_count && i < 10; i++) {
+        Habit *h = &gs->habits[i];
+        int y    = 5 + i * 2;
+        int pct  = total > 0 ? (values[i] * 100 / total) : 0;
+
+        wattron(w, COLOR_PAIR(colors[i % 5]) | A_BOLD);
+        mvwprintw(w, y, legend_x, "█");
+        wattroff(w, COLOR_PAIR(colors[i % 5]) | A_BOLD);
+
+        wattron(w, COLOR_PAIR(6));
+        mvwprintw(w, y, legend_x + 2, "%-18s", h->name);
+        wattroff(w, COLOR_PAIR(6));
+
+        wattron(w, COLOR_PAIR(1));
+        mvwprintw(w, y, legend_x + 21, "%3d%%  Lv%d  🔥%d",
+                  pct, h->power_level, h->streak);
+        wattroff(w, COLOR_PAIR(1));
+    }
+
+    wrefresh(w);
 }
