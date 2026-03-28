@@ -17,5 +17,6 @@ int  db_save_daily_log(int completed, int total, int xp,
                        int mood, float sleep, int perfect);
 int db_delete_habit(int id);
 int db_update_habit(const Habit *h);
+int db_load_weekly_log(DailyLog *logs, int *count, int days);
 
 #endif

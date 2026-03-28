@@ -64,4 +64,14 @@ typedef struct {
 	int running;
 } GameState;
 
+typedef struct {
+    char date[12];          // "YYYY-MM-DD"
+    int  habits_completed;
+    int  habits_total;
+    int  xp_earned;
+    int  mood;
+    float sleep_hours;
+    int  perfect_day;
+} DailyLog;
+
 #endif

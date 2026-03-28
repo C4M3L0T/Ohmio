@@ -174,31 +174,180 @@ void panel_draw_week(WINDOW *w, GameState *gs) {
     werase(w);
     draw_box_gold(w);
 
+    int rows, cols;
+    getmaxyx(w, rows, cols);
+
     wattron(w, COLOR_PAIR(1) | A_BOLD);
-    mvwprintw(w, 1, 2, "SEMANA ACTUAL");
+    mvwprintw(w, 1, 2, "CRONICA SEMANAL");
     wattroff(w, COLOR_PAIR(1) | A_BOLD);
 
-    const char *days[] = {"Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom"};
-    int cols;
-    int rows;
-    getmaxyx(w, rows, cols);
-    (void)rows;
-    int col_w = (cols - 4) / 7;
+    // Carga los últimos 14 días (semana actual + anterior)
+    DailyLog logs[14];
+    int count = 0;
+    db_load_weekly_log(logs, &count, 14);
 
-    for (int i = 0; i < 7; i++) {
-        int x = 2 + i * col_w;
-        wattron(w, COLOR_PAIR(1));
-        mvwprintw(w, 2, x, "%s", days[i]);
-        wattroff(w, COLOR_PAIR(1));
-        // Placeholder — en siguiente fase lees daily_log de la DB
-        wattron(w, COLOR_PAIR(6));
-        mvwprintw(w, 4, x, "---");
-        wattroff(w, COLOR_PAIR(6));
+    if (count == 0) {
+        wattron(w, COLOR_PAIR(5));
+        mvwprintw(w, rows/2, 4, "Sin historial aun. Completa habitos para registrar.");
+        wattroff(w, COLOR_PAIR(5));
+        wrefresh(w);
+        return;
     }
 
-    wattron(w, COLOR_PAIR(5));
-    mvwprintw(w, 8, 2, "Historico disponible proxima fase");
-    wattroff(w, COLOR_PAIR(5));
+    // Nombres de días de la semana
+    const char *day_names[] = {"Do","Lu","Ma","Mi","Ju","Vi","Sa"};
+
+    // --- SECCIÓN 1: Gráfica de barras por día (últimos 7) ---
+    wattron(w, COLOR_PAIR(1));
+    mvwprintw(w, 2, 2, "ULTIMOS 7 DIAS");
+    wattroff(w, COLOR_PAIR(1));
+
+    int chart_h  = 8;
+    int base_y   = 12;
+    int bar_w    = 3;
+    int start_x  = 6;
+    int week_count = count < 7 ? count : 7;
+
+    // Eje Y
+    wattron(w, COLOR_PAIR(6) | A_DIM);
+    for (int i = 0; i <= chart_h; i++)
+        mvwprintw(w, base_y - i, start_x - 1, "│");
+    mvwprintw(w, base_y + 1, start_x - 1, "└");
+    wattroff(w, COLOR_PAIR(6) | A_DIM);
+
+    // Referencia 100%
+    wattron(w, COLOR_PAIR(6) | A_DIM);
+    mvwprintw(w, base_y - chart_h, start_x - 4, "100");
+    for (int x = start_x; x < start_x + week_count * (bar_w + 3) + 2; x++)
+        mvwprintw(w, base_y - chart_h, x, "·");
+    wattroff(w, COLOR_PAIR(6) | A_DIM);
+
+    // Los logs vienen DESC (hoy primero), invertimos para mostrar cronológico
+    for (int i = 0; i < week_count; i++) {
+        // Índice invertido: el más antiguo primero en la gráfica
+        DailyLog *l = &logs[week_count - 1 - i];
+        int bar_x   = start_x + 1 + i * (bar_w + 3);
+
+        // % de completado
+        int pct = (l->habits_total > 0)
+                  ? (l->habits_completed * 100 / l->habits_total)
+                  : 0;
+        int bar_h = pct * chart_h / 100;
+
+        // Color según % completado
+        int color = (pct == 100) ? 3 :   // verde = perfecto
+                    (pct >= 60)  ? 1 :   // gold  = bien
+                    (pct >= 30)  ? 5 :   // violeta = regular
+                                   4;   // rojo  = mal
+
+        // Dibuja barra
+        for (int bx = 0; bx < bar_w; bx++)
+            for (int by = 0; by < bar_h; by++) {
+                wattron(w, COLOR_PAIR(color));
+                mvwprintw(w, base_y - by, bar_x + bx,
+                          by == bar_h - 1 ? "▄" : "█");
+                wattroff(w, COLOR_PAIR(color));
+            }
+
+        // Día perfecto: corona encima
+        if (l->perfect_day) {
+            wattron(w, COLOR_PAIR(1) | A_BOLD);
+            mvwprintw(w, base_y - bar_h - 1, bar_x, " ★");
+            wattroff(w, COLOR_PAIR(1) | A_BOLD);
+        }
+
+        // % encima de la barra
+        wattron(w, COLOR_PAIR(color));
+        mvwprintw(w, base_y - bar_h - (l->perfect_day ? 2 : 1),
+                  bar_x, "%2d%%", pct);
+        wattroff(w, COLOR_PAIR(color));
+
+        // Nombre del día abajo
+        // Extrae el día de la semana del date "YYYY-MM-DD"
+        struct tm tm_day = {0};
+        sscanf(l->date, "%d-%d-%d",
+               &tm_day.tm_year, &tm_day.tm_mon, &tm_day.tm_mday);
+        tm_day.tm_year -= 1900;
+        tm_day.tm_mon  -= 1;
+        mktime(&tm_day);
+
+        wattron(w, COLOR_PAIR(6));
+        mvwprintw(w, base_y + 1, bar_x, "%s", day_names[tm_day.tm_wday]);
+        wattroff(w, COLOR_PAIR(6));
+
+        // XP del día
+        wattron(w, COLOR_PAIR(1));
+        mvwprintw(w, base_y + 2, bar_x - 1, "%3d", l->xp_earned);
+        wattroff(w, COLOR_PAIR(1));
+    }
+
+    // Leyenda XP
+    wattron(w, COLOR_PAIR(1) | A_DIM);
+    mvwprintw(w, base_y + 2, start_x - 4, "XP");
+    wattroff(w, COLOR_PAIR(1) | A_DIM);
+
+    // --- SECCIÓN 2: Resumen lateral ---
+    int rx = start_x + week_count * (bar_w + 3) + 6;
+
+    wattron(w, COLOR_PAIR(1) | A_BOLD);
+    mvwprintw(w, 3, rx, "RESUMEN");
+    wattroff(w, COLOR_PAIR(1) | A_BOLD);
+
+    // Calcula stats de la semana actual (primeros 7 logs)
+    int perfect_days = 0, total_xp = 0, total_done = 0, total_habits = 0;
+    for (int i = 0; i < week_count; i++) {
+        perfect_days += logs[i].perfect_day;
+        total_xp     += logs[i].xp_earned;
+        total_done   += logs[i].habits_completed;
+        total_habits += logs[i].habits_total;
+    }
+    int week_pct = (total_habits > 0)
+                   ? (total_done * 100 / total_habits) : 0;
+
+    wattron(w, COLOR_PAIR(3));
+    mvwprintw(w, 5, rx, "Dias perfectos");
+    mvwprintw(w, 6, rx, "★ %d / %d", perfect_days, week_count);
+    wattroff(w, COLOR_PAIR(3));
+
+    wattron(w, COLOR_PAIR(1));
+    mvwprintw(w, 8,  rx, "XP esta semana");
+    mvwprintw(w, 9,  rx, "⚡ %d xp", total_xp);
+    wattroff(w, COLOR_PAIR(1));
+
+    wattron(w, COLOR_PAIR(2));
+    mvwprintw(w, 11, rx, "Completado");
+    mvwprintw(w, 12, rx, "◈ %d%%", week_pct);
+    wattroff(w, COLOR_PAIR(2));
+
+    // Comparación con semana anterior
+    if (count >= 14) {
+        int prev_xp = 0, prev_done = 0, prev_total = 0;
+        for (int i = 7; i < 14; i++) {
+            prev_xp   += logs[i].xp_earned;
+            prev_done += logs[i].habits_completed;
+            prev_total+= logs[i].habits_total;
+        }
+        int prev_pct = prev_total > 0 ? (prev_done * 100 / prev_total) : 0;
+        int diff_pct = week_pct - prev_pct;
+        int diff_xp  = total_xp - prev_xp;
+
+        wattron(w, COLOR_PAIR(1) | A_BOLD);
+        mvwprintw(w, 14, rx, "VS SEMANA ANT.");
+        wattroff(w, COLOR_PAIR(1) | A_BOLD);
+
+        int color_pct = diff_pct >= 0 ? 3 : 4;
+        int color_xp  = diff_xp  >= 0 ? 3 : 4;
+
+        wattron(w, COLOR_PAIR(color_pct));
+        mvwprintw(w, 15, rx, "%s%d%% completado",
+                  diff_pct >= 0 ? "▲ +" : "▼ ", diff_pct);
+        wattroff(w, COLOR_PAIR(color_pct));
+
+        wattron(w, COLOR_PAIR(color_xp));
+        mvwprintw(w, 16, rx, "%s%d xp",
+                  diff_xp >= 0 ? "▲ +" : "▼ ", diff_xp);
+        wattroff(w, COLOR_PAIR(color_xp));
+    }
 
     wrefresh(w);
 }

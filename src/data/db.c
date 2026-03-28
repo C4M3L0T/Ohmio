@@ -320,3 +320,33 @@ int db_update_habit(const Habit *h) {
     sqlite3_finalize(stmt);
     return (rc == SQLITE_DONE) ? 0 : -1;
 }
+
+// Lee los últimos N días del log
+int db_load_weekly_log(DailyLog *logs, int *count, int days) {
+    const char *sql =
+        "SELECT date, habits_completed, habits_total, xp_earned,"
+        "mood, sleep_hours, perfect_day"
+        " FROM daily_log"
+        " ORDER BY date DESC LIMIT ?;";
+
+    sqlite3_stmt *stmt;
+    sqlite3_prepare_v2(DB, sql, -1, &stmt, NULL);
+    sqlite3_bind_int(stmt, 1, days);
+    *count = 0;
+
+    while (sqlite3_step(stmt) == SQLITE_ROW && *count < days) {
+        DailyLog *l = &logs[*count];
+        strncpy(l->date, (const char*)sqlite3_column_text(stmt, 0), 11);
+        l->date[11]          = '\0';
+        l->habits_completed  = sqlite3_column_int(stmt, 1);
+        l->habits_total      = sqlite3_column_int(stmt, 2);
+        l->xp_earned         = sqlite3_column_int(stmt, 3);
+        l->mood              = sqlite3_column_int(stmt, 4);
+        l->sleep_hours       = (float)sqlite3_column_double(stmt, 5);
+        l->perfect_day       = sqlite3_column_int(stmt, 6);
+        (*count)++;
+    }
+
+    sqlite3_finalize(stmt);
+    return 0;
+}
