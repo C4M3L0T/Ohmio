@@ -187,6 +187,10 @@ exec-once = ~/.local/bin/ohmio-daemon
 | `e` | Edit selected habit | Editar hábito seleccionado |
 | `d` | Delete (with confirmation) | Borrar (con confirmación) |
 | `q` | Quit & save | Salir y guardar |
+| `ENTER` | Iniciar / reanudar pomodoro | Cualquier panel |
+| `SPACE` | Pausar / reanudar (si no estás en hábitos) | Cualquier panel |
+| `ESC` | Detener y resetear | Cualquier panel |
+| `F2` | Abrir configuración | Cualquier panel |
 
 ---
 
