@@ -55,6 +55,35 @@ typedef struct {
 	time_t redeemed_at;
 } Reward;
 
+typedef enum {
+    POMO_IDLE = 0,
+    POMO_WORK,
+    POMO_SHORT_BREAK,
+    POMO_LONG_BREAK,
+    POMO_DONE
+} PomoStatus;
+
+typedef struct {
+    int work_minutes;        // duración del periodo de trabajo
+    int short_break_minutes; // duración descanso corto
+    int long_break_minutes;  // duración descanso largo
+    int periods_per_cycle;   // periodos antes del descanso largo
+    int xp_per_pomodoro;     // XP por cada pomodoro completado
+    int xp_bonus_cycle;      // XP bonus al completar el ciclo completo
+} PomoConfig;
+
+typedef struct {
+    PomoConfig config;
+    PomoStatus status;
+    int        current_period;   // 1-based, qué pomodoro vas
+    int        completed_today;  // cuántos pomodoros completó hoy
+    time_t     period_start;     // cuando arrancó el periodo actual
+    int        paused;           // 0 o 1
+    time_t     pause_start;      // cuando pausó
+    int        pause_elapsed;    // segundos acumulados en pausa
+    int        xp_earned_session;// XP ganado en esta sesión
+} PomodoroState;
+
 typedef struct {
 	Habit habits[MAX_HABITS];
 	int habit_count;
@@ -62,6 +91,7 @@ typedef struct {
 	Reward rewards[50];
 	int reward_count;
 	int running;
+	PomodoroState pomo;
 } GameState;
 
 typedef struct {
@@ -73,5 +103,9 @@ typedef struct {
     float sleep_hours;
     int  perfect_day;
 } DailyLog;
+
+
+
+
 
 #endif

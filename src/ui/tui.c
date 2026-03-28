@@ -4,6 +4,7 @@
 #include "tui.h"
 #include "renderer.h"
 #include "panels.h"
+#include "pomodoro.h"
 
 // Dimensiones globales
 int ROWS, COLS;
@@ -38,7 +39,7 @@ static const char *menu_items[] = {
 };
 
 static const char *menu_icons[] = {
-    "⚔", "★", "◈", "✦", "◉"
+    "", "★", "◈", "✦", "◉"
 };
 
 void tui_init(void) {
@@ -100,57 +101,72 @@ static void handle_resize(void) {
 }
 
 static void handle_input(int ch, GameState *gs) {
-	switch (ch) {
+    switch (ch) {
         case 'q': case 'Q':
             gs->running = 0;
             break;
 
+        // ── Navegación sidebar ──────────────────────
         case 'k': case KEY_UP:
             if (current_view == VIEW_HABITS)
-                panel_habits_move(gs, -1);   // mueve cursor hábitos
+                panel_habits_move(gs, -1);
             else
                 current_view = (current_view - 1 + VIEW_COUNT) % VIEW_COUNT;
             break;
-
         case 'j': case KEY_DOWN:
             if (current_view == VIEW_HABITS)
-                panel_habits_move(gs, 1);    // mueve cursor hábitos
+                panel_habits_move(gs, 1);
             else
                 current_view = (current_view + 1) % VIEW_COUNT;
             break;
-
-        // Navegar el sidebar con Tab o H/L
-        case 'h': case KEY_LEFT:
-        case '\t':                           // Tab también navega
+        case 'h': case KEY_LEFT: case '\t':
             current_view = (current_view - 1 + VIEW_COUNT) % VIEW_COUNT;
             break;
-
         case 'l': case KEY_RIGHT:
             current_view = (current_view + 1) % VIEW_COUNT;
             break;
 
+        // ── Hábitos ─────────────────────────────────
         case ' ':
             if (current_view == VIEW_HABITS)
                 panel_habits_complete(gs);
+            else
+                pomo_pause_toggle(&gs->pomo);  // espacio pausa el pomo
             break;
-
         case 'a': case 'A':
             if (current_view == VIEW_HABITS)
                 panel_habits_add(gs, win_footer);
+            break;
+        case 'e': case 'E':
+            if (current_view == VIEW_HABITS)
+                panel_habits_edit(gs, win_footer);
+            break;
+        case 'd': case 'D':
+            if (current_view == VIEW_HABITS)
+                panel_habits_delete(gs, win_footer);
+            break;
+
+        // ── Pomodoro — globales ──────────────────────
+        // ENTER arranca o reanuda desde cualquier panel
+        case '\n': case KEY_ENTER: case 13:
+            if (gs->pomo.status == POMO_IDLE ||
+                gs->pomo.status == POMO_DONE)
+                pomo_start(&gs->pomo);
+            break;
+
+        // F2 abre el modal de configuración
+        case KEY_F(2):
+            pomo_config_modal(&gs->pomo, win_content, win_footer);
+            break;
+
+        // ESC resetea el pomodoro
+        case 27:
+            pomo_stop(&gs->pomo);
             break;
 
         case KEY_RESIZE:
             handle_resize();
             break;
-	case 'e': case 'E':
-	    if (current_view == VIEW_HABITS)
-	        panel_habits_edit(gs, win_footer);
-	    break;
-
-	case 'd': case 'D':
-	    if (current_view == VIEW_HABITS)
-	        panel_habits_delete(gs, win_footer);
-	    break;
     }
 }
 
@@ -158,6 +174,21 @@ void tui_run(GameState *gs) {
     gs->running = 1;
 
     while (gs->running) {
+	// Tick del pomodoro — verifica si terminó algún periodo
+    	int pomo_event = pomo_tick(&gs->pomo, &gs->hero);
+    	if (pomo_event) {
+        // Notificación del sistema
+        const char *msg = (gs->pomo.status == POMO_WORK)
+            ? " Ohmio — ¡Regresa al trabajo!"
+            : (gs->pomo.status == POMO_DONE)
+            ? "★ Ohmio — ¡Ciclo completo! Bonus XP ganado."
+            : " Ohmio — Tómate un descanso.";
+
+        // Usa el mismo sistema del daemon vía notify-send
+        char cmd[256];
+        snprintf(cmd, sizeof(cmd), "notify-send 'Ohmio' '%s' &", msg);
+        system(cmd);
+    }
         // 1. Dibuja todo
         render_header(win_header, gs);
         render_sidebar(win_sidebar, menu_items, menu_icons,

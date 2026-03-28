@@ -626,3 +626,120 @@ void panel_draw_powers(WINDOW *w, GameState *gs) {
 
     wrefresh(w);
 }
+
+void pomo_config_modal(PomodoroState *p, WINDOW *content, WINDOW *footer) {
+    if (p->status != POMO_IDLE && p->status != POMO_DONE) {
+        // No se puede configurar mientras corre
+        werase(footer);
+        draw_box_gold(footer);
+        wattron(footer, COLOR_PAIR(4));
+        mvwprintw(footer, 1, 2,
+                  "Detén el pomodoro antes de configurar  [ESC para detener]");
+        wattroff(footer, COLOR_PAIR(4));
+        wrefresh(footer);
+        napms(1500);
+        return;
+    }
+
+    nodelay(stdscr, FALSE);
+
+    int rows, cols;
+    getmaxyx(content, rows, cols);
+
+    // Crea una ventana modal centrada
+    int modal_h = 14, modal_w = 44;
+    int modal_y = (rows - modal_h) / 2;
+    int modal_x = (cols - modal_w) / 2;
+    WINDOW *modal = newwin(modal_h, modal_w, modal_y, modal_x);
+
+    int selected = 0;  // campo seleccionado
+    int running  = 1;
+
+    while (running) {
+        werase(modal);
+        wattron(modal, COLOR_PAIR(1));
+        box(modal, 0, 0);
+        wattroff(modal, COLOR_PAIR(1));
+
+        wattron(modal, COLOR_PAIR(1) | A_BOLD);
+        mvwprintw(modal, 1, (modal_w - 19) / 2, "CONFIGURAR POMODORO");
+        wattroff(modal, COLOR_PAIR(1) | A_BOLD);
+
+        // Campos configurables
+        const char *labels[] = {
+            "Trabajo      ",
+            "Desc. corto  ",
+            "Desc. largo  ",
+            "Periodos     ",
+        };
+        int *values[] = {
+            &p->config.work_minutes,
+            &p->config.short_break_minutes,
+            &p->config.long_break_minutes,
+            &p->config.periods_per_cycle,
+        };
+        const char *units[] = {"min", "min", "min", "    "};
+        int mins[]  = {5,  1,  5, 1};
+        int maxs[]  = {90, 30, 60, 8};
+        int steps[] = {5,  1,  5, 1};
+
+        for (int i = 0; i < 4; i++) {
+            int y = 3 + i * 2;
+            if (i == selected) {
+                wattron(modal, COLOR_PAIR(7) | A_BOLD);
+                mvwprintw(modal, y, 2, " %s  ◀ %2d %s ▶ ",
+                          labels[i], *values[i], units[i]);
+                wattroff(modal, COLOR_PAIR(7) | A_BOLD);
+            } else {
+                wattron(modal, COLOR_PAIR(6));
+                mvwprintw(modal, y, 2, " %s     %2d %s   ",
+                          labels[i], *values[i], units[i]);
+                wattroff(modal, COLOR_PAIR(6));
+            }
+        }
+
+        // XP info
+        wattron(modal, COLOR_PAIR(1));
+        mvwprintw(modal, 11, 2, "XP por pomodoro : %d",
+                  p->config.xp_per_pomodoro);
+        mvwprintw(modal, 12, 2, "Bonus ciclo     : %d",
+                  p->config.xp_bonus_cycle);
+        wattroff(modal, COLOR_PAIR(1));
+
+        // Instrucciones
+        wattron(modal, COLOR_PAIR(6) | A_DIM);
+        mvwprintw(modal, modal_h - 2, 2,
+                  "[j/k] Mover  [←/→] Ajustar  [q] Cerrar");
+        wattroff(modal, COLOR_PAIR(6) | A_DIM);
+
+        wrefresh(modal);
+
+        int ch = wgetch(modal);
+        switch (ch) {
+            case 'k': case KEY_UP:
+                selected = (selected - 1 + 4) % 4;
+                break;
+            case 'j': case KEY_DOWN:
+                selected = (selected + 1) % 4;
+                break;
+            case KEY_LEFT: case 'h':
+                *values[selected] -= steps[selected];
+                if (*values[selected] < mins[selected])
+                    *values[selected] = mins[selected];
+                break;
+            case KEY_RIGHT: case 'l':
+                *values[selected] += steps[selected];
+                if (*values[selected] > maxs[selected])
+                    *values[selected] = maxs[selected];
+                break;
+            case 'q': case 'Q': case 27:  // ESC o q cierra
+                running = 0;
+                break;
+        }
+    }
+
+    delwin(modal);
+    nodelay(stdscr, TRUE);
+    touchwin(content);
+    wrefresh(content);
+}

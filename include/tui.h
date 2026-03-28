@@ -2,8 +2,11 @@
 #define TUI_H
 
 #include "types.h"
+#include <ncurses.h>
 
 extern int ROWS, COLS;
+extern WINDOW *win_content;
+extern WINDOW *win_footer;
 
 void tui_init(void);
 void tui_create_windows(void);
